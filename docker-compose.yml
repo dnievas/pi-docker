@@ -1,0 +1,83 @@
+version: '2'
+services:
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer
+    restart: unless-stopped
+    ports:
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./volumes/portainer/data:/data
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:6.3.6
+    restart: unless-stopped
+    user: "0"
+    ports:
+      - 3000:3000
+    env_file:
+      - ./services/grafana/grafana.env
+    volumes:
+      - ./volumes/grafana/data:/var/lib/grafana
+      - ./volumes/grafana/log:/var/log/grafana
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "67:67/udp"
+      - "8089:80/tcp"
+      #- "443:443/tcp"
+    env_file:
+      - ./services/pihole/pihole.env
+    volumes:
+       - ./volumes/pihole/etc-pihole/:/etc/pihole/
+       - ./volumes/pihole/etc-dnsmasq.d/:/etc/dnsmasq.d/
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    # Recommended but not required (DHCP needs NET_ADMIN)
+    #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.18.1
+    restart: unless-stopped
+    user: "0"
+    ports:
+      - 9090:9090
+    volumes:
+      - ./volumes/prometheus/data:/prometheus
+      - ./volumes/prometheus/config:/etc/prometheus
+
+  smokeping_prober:
+    container_name: smokeping_prober
+    image: smokeping_prober:latest
+    restart: unless-stopped
+    user: "0"
+    ports:
+      - 9374:9374
+
+  nodeexporter:
+    image: prom/node-exporter:v0.18.1
+    container_name: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
